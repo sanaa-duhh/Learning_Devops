@@ -21,6 +21,10 @@ DevOps homework submissions, every task documented with the actual commands run 
 | 6 | **Docker Fundamentals** | [session6-7-docker/session6_assignment.md](session6-7-docker/session6_assignment.md) |
 | 7 | **Docker Multi-Stage Build** | [session6-7-docker/session7_assignment.md](session6-7-docker/session7_assignment.md) |
 | 8 | **Docker Networking & Volumes** | [session8-docker-networking-volume/session8_assignment.md](session8-docker-networking-volume/session8_assignment.md) |
+| 9 | **Kubernetes Fundamentals** | [session9-k8s/session9_assignment.md](session9-k8s/session9_assignment.md) |
+| 10 | **Kubernetes Pods, ReplicaSets & Deployments** | [session10-k8s-core-objects/session10_assignment.md](session10-k8s-core-objects/session10_assignment.md) |
+| 11 | **Kubernetes Networking & Services** | [session-11-kubernetes-services/session11_assignment.md](session-11-kubernetes-services/session11_assignment.md) |
+| 12 | **Kubernetes Ingress, ConfigMaps & Secrets** | [session-12-ingress-configmaps-secrets/session12_assignment.md](session-12-ingress-configmaps-secrets/session12_assignment.md) |
 
 ---
 
@@ -46,6 +50,18 @@ Multi-stage Dockerfile with a builder stage and a lean production stage · conta
 
 ### [Session 8 — Docker Networking & Volumes](session8-docker-networking-volume/session8_assignment.md)
 Three containers across three networks with backend connected to two · host networking with Apache · bind mount updating live without container restart · overlay network research.
+
+### [Session 9 — Kubernetes Fundamentals](session9-k8s/session9_assignment.md)
+Minikube installed on Mac · single-node cluster verified with `kubectl get nodes` and `cluster-info` · first hello-nginx deployment exposed via NodePort · K8s architecture notes (control plane + worker node components).
+
+### [Session 10 — Kubernetes Pods, ReplicaSets & Deployments](session10-k8s-core-objects/session10_assignment.md)
+Pod lifecycle lab covering all major states (Running, Pending, Succeeded, Failed, CrashLoopBackOff, ImagePullBackOff, readiness/liveness/startup probes, init and multi-container pods) · ReplicaSet scaling up and down · all 4 deployment strategies — **rolling update**, **blue-green**, **canary** (90/10 split verified with curl loop), and **recreate**.
+
+### [Session 11 — Kubernetes Networking & Services](session-11-kubernetes-services/session11_assignment.md)
+All 5 service types applied and tested: **ClusterIP** (internal only), **NodePort** (external via node port), **LoadBalancer** (pending on Minikube, expected), **ExternalName** (DNS CNAME to `api.github.com`), and **Headless** (multiple A records for StatefulSet pods).
+
+### [Session 12 — Kubernetes Ingress, ConfigMaps & Secrets](session-12-ingress-configmaps-secrets/session12_assignment.md)
+End-to-end demo — ConfigMap and Secret feeding a backend deployment as environment variables · frontend and backend both `ClusterIP` · single Ingress routing `/` to frontend and `/api/*` to backend on host `yatri.local` · base64 encoding vs actual encryption discussed.
 
 ---
 
