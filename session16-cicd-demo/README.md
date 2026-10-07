@@ -1,83 +1,101 @@
 # Session 16 - CI/CD & GitHub Actions
 
-Built a complete CI/CD pipeline using GitHub Actions for a Python Flask demo app — covering build, test, Docker image creation, artifacts, secrets, and a deploy step.
+Built a complete CI/CD pipeline using GitHub Actions for a Python demo app. Covers CI (build + test), image packaging, artifacts, secrets, and a CD step gated on the main branch.
 
-Workflow file: [`.github/workflows/cicd.yml`](../.github/workflows/cicd.yml)
-Demo app: `session16-cicd-demo/` (Flask + pytest + Dockerfile)
+**Workflow:** [`.github/workflows/cicd.yml`](../.github/workflows/cicd.yml)
+**App:** Python module with `add`/`subtract`/`divide` functions + pytest tests + Dockerfile
+
+---
+
+## CI vs CD
+
+- **Continuous Integration** — every push and PR runs tests and builds. Catches bugs before they land. In this project: the `build-and-test` and `docker-build` jobs.
+- **Continuous Deployment** — automatically ships what passed CI. In this project: the `deploy` job, which only runs on `main`.
 
 ---
 
 ## Pipeline Structure
 
 ```
-build-and-test  →  docker-build  →  deploy
-     ↓                    ↓
-test-report.xml      image.tar
-  (artifact)         (artifact)
+    push / PR / manual
+            ↓
+   ┌─────────────────┐
+   │  Build and Test │   ← pytest + upload test-report artifact
+   └────────┬────────┘
+            ↓
+   ┌─────────────────┐
+   │ Build Docker    │   ← docker build + save image.tar artifact
+   │     Image       │
+   └────────┬────────┘
+            ↓
+   ┌─────────────────┐
+   │     Deploy      │   ← uses DEPLOY_TOKEN secret, main-only
+   └─────────────────┘
 ```
 
-Three jobs chained with `needs:`:
-1. **Build & Test** — installs deps, runs pytest, uploads test report as artifact
-2. **Build Docker Image** — builds the image, saves it as a tar artifact
-3. **Deploy** — only runs on `main` branch, uses a `DEPLOY_TOKEN` secret
+Jobs are chained with `needs:` so each stage only runs if the previous one passed.
 
 ---
 
-## CI vs CD
+## Concepts Mapped to the Workflow
 
-- **CI (Continuous Integration)** — Build & Test jobs. Every push/PR runs them to catch bugs early.
-- **CD (Continuous Deployment)** — the Deploy job. Only runs on `main` after CI passes.
-
----
-
-## Concepts Covered
-
-| Concept | Where in the workflow |
+| Concept | Where it shows up |
 |---|---|
-| Workflow | `cicd.yml` — the top-level pipeline definition |
+| Workflow | `cicd.yml` itself |
 | Jobs | `build-and-test`, `docker-build`, `deploy` |
 | Steps | each `- name:` block inside a job |
-| Runners | `runs-on: ubuntu-latest` — GitHub-hosted VMs |
-| Secrets | `${{ secrets.DEPLOY_TOKEN }}` injected into deploy job |
-| Artifacts | `actions/upload-artifact@v4` — test report and docker image |
+| Runners | `runs-on: ubuntu-latest` (GitHub-hosted VM) |
 | Triggers | `push`, `pull_request`, `workflow_dispatch` |
+| Secrets | `${{ secrets.DEPLOY_TOKEN }}` in the deploy job |
+| Artifacts | `actions/upload-artifact@v4` for test report and image |
 | Build | `pip install` + `docker build` |
 | Test | `pytest tests/` with JUnit XML output |
 
 ---
 
-## Running the Pipeline
+## Pipeline Execution
 
-Triggered automatically on push to `main` or any PR. Can also be run manually from the Actions tab → "Run workflow".
+### 1. Actions tab showing the successful run
 
 ![session16_1](../.screenshots/session16_1.png)
 
-Pipeline job graph — the three jobs chained with dependencies:
+### 2. Job graph — three stages chained
 
 ![session16_2](../.screenshots/session16_2.png)
 
-Test step output — pytest running inside the Build & Test job:
+### 3. Test step — pytest output inside Build and Test job
 
 ![session16_3](../.screenshots/session16_3.png)
 
-Deploy job showing the secret was accessed:
+All 4 tests passed: `test_add`, `test_subtract`, `test_divide`, `test_divide_by_zero`.
+
+### 4. Deploy step — secret injection working
 
 ![session16_4](../.screenshots/session16_4.png)
 
-Artifacts from the completed run — the test report and docker image tarball:
+The `DEPLOY_TOKEN` secret from repo settings gets injected as an env var only at runtime inside the deploy job.
+
+### 5. Artifacts section — downloadable outputs
 
 ![session16_5](../.screenshots/session16_5.png)
 
+Two artifacts attached to the run: the pytest JUnit report and the Docker image tarball.
+
 ---
 
-## Local Verification
-
-The demo app can also run outside the pipeline:
+## Running Locally
 
 ```bash
 cd session16-cicd-demo
 pip install -r requirements.txt
 pytest tests/
 docker build -t cicd-demo .
-docker run -p 5000:5000 cicd-demo
 ```
+
+---
+
+## What I took away
+
+- **CI stops bad code from merging; CD stops good code from waiting.** The pipeline enforces both.
+- **Artifacts > rebuilds.** The image built once in CI gets passed to CD, so what you tested is literally what gets deployed.
+- **Secrets never leak into the YAML.** They live in GitHub's secret store and get injected into the job env only when the step runs.
