@@ -1,5 +1,7 @@
 # Session 21 — DevOps Final Capstone: TaskBoard (Python)
 
+The completed Session 21 Docker Compose assignment, execution results, and screenshots are in [submission/README.md](submission/README.md).
+
 ## 1. What we are building
 
 TaskBoard is a small but realistic SaaS-style project management application:
@@ -156,21 +158,23 @@ Requirements:
 Run:
 
 ```bash
-docker compose up --build
+docker compose up -d --build
+docker compose ps
 ```
 
 Open:
 
 ```text
-http://localhost:3000
+http://localhost:3005
 ```
 
 Backend:
 
 ```text
-http://localhost:8000/docs
-http://localhost:8000/health
-http://localhost:8000/metrics
+http://localhost:8002/docs
+http://localhost:8002/health
+http://localhost:8002/ready
+http://localhost:8002/metrics
 ```
 
 Stop:
@@ -178,6 +182,8 @@ Stop:
 ```bash
 docker compose down
 ```
+
+Host ports are `3005` for the frontend, `8002` for the backend, and `55434` for PostgreSQL, avoiding other local applications. Container ports remain `80`, `8000`, and `5432`. The local demo uses PostgreSQL 15, which was already cached when the initial PostgreSQL 16 image pull timed out. Compose waits for PostgreSQL and backend readiness before starting dependent services.
 
 Delete database volume too:
 
@@ -191,46 +197,67 @@ docker compose down -v
 
 Requirements:
 
-- Python 3.12+
-- PostgreSQL
+- Python 3.12 (available through `uv`)
+- PostgreSQL, started with the supplied Compose service
+
+From `session21-python`, start the database:
+
+```bash
+docker compose up -d postgres
+docker compose exec postgres pg_isready -U taskboard -d taskboard
+```
+
+Wait for `accepting connections`, then:
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+uv venv --python 3.12 .venv-session21
+source .venv-session21/bin/activate
+uv pip install --python .venv-session21/bin/python -r requirements.txt
 ```
 
 Set the database connection:
 
 ```bash
-export DATABASE_URL='postgresql+psycopg://taskboard:taskboard@localhost:5432/taskboard'
+export DATABASE_URL='postgresql+psycopg://taskboard:taskboard@localhost:55434/taskboard'
 ```
 
 Run migrations:
 
 ```bash
-alembic upgrade head
+.venv-session21/bin/python -m alembic upgrade head
 ```
 
 Start FastAPI:
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+.venv-session21/bin/python -m uvicorn app.main:app --reload --port 8002
 ```
 
 Test:
 
 ```bash
-curl http://localhost:8000/health
-curl http://localhost:8000/api/tasks
+curl http://localhost:8002/health
+curl http://localhost:8002/ready
+curl http://localhost:8002/api/tasks
+curl http://localhost:8002/api/tasks/stats
 ```
 
 Open:
 
 ```text
-http://localhost:8000/docs
+http://localhost:8002/docs
 ```
+
+In a separate terminal, run the frontend directly:
+
+```bash
+cd ~/Codes/devops/devops-heros/session21-python/frontend
+npm install
+npm run dev -- --host 127.0.0.1 --port 5174 --strictPort
+```
+
+Open `http://localhost:5174`. Vite proxies `/api` to the backend at `http://localhost:8002`. Create a task, advance its status, and refresh to verify persistence. Before starting the full Compose stack, stop both manual servers with `Ctrl+C`; the database service can remain running.
 
 ---
 
@@ -306,8 +333,8 @@ docker build -t taskboard-backend:local ./backend
 Run with a reachable PostgreSQL instance:
 
 ```bash
-docker run --rm -p 8000:8000 \
-  -e DATABASE_URL='postgresql+psycopg://taskboard:taskboard@host.docker.internal:5432/taskboard' \
+docker run --rm -p 127.0.0.1:8002:8000 \
+  -e DATABASE_URL='postgresql+psycopg://taskboard:taskboard@host.docker.internal:55434/taskboard' \
   taskboard-backend:local
 ```
 

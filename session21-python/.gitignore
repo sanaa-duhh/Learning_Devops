@@ -8,3 +8,8 @@ target/
 .terraform/
 *.tfstate
 *.tfstate.*
+.venv*/
+__pycache__/
+*.py[cod]
+test.db
+.pytest_cache/
