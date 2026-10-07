@@ -1,0 +1,79 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'session16-cicd-demo/**'
+      - '.github/workflows/cicd.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # CI: build + test
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: ./session16-cicd-demo
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        working-directory: ./session16-cicd-demo
+        run: pytest tests/ --junitxml=test-report.xml
+
+      - name: Upload test report artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-report
+          path: session16-cicd-demo/test-report.xml
+
+  # CI: build docker image
+  docker-build:
+    name: Build Docker Image
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        working-directory: ./session16-cicd-demo
+        run: |
+          docker build -t cicd-demo:${{ github.sha }} .
+          docker save cicd-demo:${{ github.sha }} > image.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: session16-cicd-demo/image.tar
+
+  # CD: deploy step (simulated — just prints that a deploy would run)
+  deploy:
+    name: Deploy
+    needs: docker-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy to environment
+        env:
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: |
+          echo "Deploying commit ${{ github.sha }} to production"
+          echo "Deploy token present: ${DEPLOY_TOKEN:+yes}"
+          echo "This is where a real kubectl / helm / ssh step would go"
