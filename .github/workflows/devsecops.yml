@@ -1,0 +1,181 @@
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'session17-devsecops-demo/**'
+      - '.github/workflows/devsecops.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # Stage 1: Build & Test
+  build-and-test:
+    name: Build & Unit Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        working-directory: ./session17-devsecops-demo
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run unit tests
+        working-directory: ./session17-devsecops-demo
+        run: pytest tests/ --junitxml=test-report.xml
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-report
+          path: session17-devsecops-demo/test-report.xml
+
+  # Stage 2: SAST (static analysis)
+  sast:
+    name: SAST (Bandit)
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Run Bandit SAST
+        working-directory: ./session17-devsecops-demo
+        run: bandit -r app/ -f json -o bandit-report.json || true
+
+      - name: Upload SAST report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: session17-devsecops-demo/bandit-report.json
+
+  # Stage 3: SCA (dependency vulnerabilities)
+  sca:
+    name: SCA (pip-audit)
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        working-directory: ./session17-devsecops-demo
+        run: pip-audit -r requirements.txt -f json -o sca-report.json || true
+
+      - name: Upload SCA report
+        uses: actions/upload-artifact@v4
+        with:
+          name: sca-report
+          path: session17-devsecops-demo/sca-report.json
+
+  # Stage 4: Secret scanning
+  secret-scan:
+    name: Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  # Stage 5: Docker build + container image scan + security gate
+  docker-and-scan:
+    name: Docker Build + Trivy Scan (Security Gate)
+    runs-on: ubuntu-latest
+    needs: [sast, sca, secret-scan]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        working-directory: ./session17-devsecops-demo
+        run: docker build -t devsecops-demo:${{ github.sha }} .
+
+      - name: Trivy container scan (security gate)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'devsecops-demo:${{ github.sha }}'
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Save image artifact
+        working-directory: ./session17-devsecops-demo
+        run: docker save devsecops-demo:${{ github.sha }} > image.tar
+
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: session17-devsecops-demo/image.tar
+
+  # Stage 6: Push image (simulated — pushes to GHCR if token set)
+  push-image:
+    name: Push Image to Registry
+    runs-on: ubuntu-latest
+    needs: docker-and-scan
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push to GHCR
+        working-directory: ./session17-devsecops-demo
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/devsecops-demo:${{ github.sha }}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "Pushed: $IMAGE"
+
+  # Stage 7: Deploy (simulated)
+  deploy:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: push-image
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Simulated kubectl deploy
+        run: |
+          echo "Would run: kubectl apply -f session17-devsecops-demo/k8s/"
+          cat session17-devsecops-demo/k8s/deployment.yaml
+          cat session17-devsecops-demo/k8s/service.yaml
