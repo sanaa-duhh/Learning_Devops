@@ -3,7 +3,7 @@ services:
     image: prom/prometheus:v3.5.0
     container_name: session20-prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9092:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
 
@@ -11,6 +11,6 @@ services:
     image: grafana/grafana:12.1.1
     container_name: session20-grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3003:3000"
     depends_on:
       - prometheus

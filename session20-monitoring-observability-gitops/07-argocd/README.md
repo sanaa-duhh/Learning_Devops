@@ -1,5 +1,7 @@
 # GitOps Demo with Argo CD
 
+The completed Session 20 assignment, screenshots, Minikube setup, and verified deployment results are in the [Session 20 README](../README.md).
+
 Argo CD watches this Git repository and keeps your Kubernetes cluster in sync with whatever is committed here.
 
 ```
@@ -423,7 +425,7 @@ kubectl patch application session20-app -n argocd \
 **Fix:** Re-apply the full install to restore the missing CRD:
 
 ```bash
-kubectl apply -n argocd \
+kubectl apply -n argocd --server-side --force-conflicts \
   -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
 kubectl rollout restart deployment argocd-applicationset-controller -n argocd

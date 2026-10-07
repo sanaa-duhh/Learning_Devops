@@ -56,10 +56,10 @@ Open:
 
 ```text
 Prometheus:
-http://localhost:9090
+http://localhost:9092
 
 Grafana:
-http://localhost:3000
+http://localhost:3003
 ```
 
 ---
